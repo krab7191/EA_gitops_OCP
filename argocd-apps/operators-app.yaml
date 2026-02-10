@@ -15,6 +15,9 @@ spec:
     path: operators
     directory:
       recurse: true
+      # ROSA: if Terraform manages operator subscriptions, uncomment exclude
+      # to skip subscription/namespace/operatorgroup files:
+      # exclude: '{event-streams/*,event-processing/*,event-endpoint-mgmt/*,flink/*}'
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-operators
