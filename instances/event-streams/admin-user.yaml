@@ -1,0 +1,32 @@
+---
+apiVersion: eventstreams.ibm.com/v1beta2
+kind: KafkaUser
+metadata:
+  name: es-prod-admin
+  namespace: event-streams
+  labels:
+    eventstreams.ibm.com/cluster: es-prod
+spec:
+  authentication:
+    type: scram-sha-512
+  authorization:
+    type: simple
+    acls:
+      - resource:
+          type: topic
+          name: '*'
+          patternType: literal
+        operations: ['All']
+      - resource:
+          type: group
+          name: '*'
+          patternType: literal
+        operations: ['All']
+      - resource:
+          type: cluster
+        operations: ['All']
+      - resource:
+          type: transactionalId
+          name: '*'
+          patternType: literal
+        operations: ['All']

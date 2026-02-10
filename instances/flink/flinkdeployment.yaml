@@ -1,0 +1,46 @@
+---
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: production-flink
+  namespace: flink
+spec:
+  serviceAccount: flink
+  mode: native
+  flinkConfiguration:
+    license.use: EventAutomationProduction
+    license.license: L-CYBH-K48BZQ
+    license.accept: 'true'
+    taskmanager.numberOfTaskSlots: '10'
+    state.backend.type: rocksdb
+    execution.checkpointing.interval: '5000'
+    execution.checkpointing.num-retained: '3'
+    execution.checkpointing.incremental: 'true'
+    restart-strategy.type: failure-rate
+    restart-strategy.failure-rate.max-failures-per-interval: '10'
+    restart-strategy.failure-rate.failure-rate-interval: '10 min'
+    restart-strategy.failure-rate.delay: '30 s'
+    table.exec.source.idle-timeout: '30 s'
+  podTemplate:
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: pod-template
+    spec:
+      containers:
+        - name: flink-main-container
+          volumeMounts:
+            - name: flink-logs
+              mountPath: /opt/flink/log
+      volumes:
+        - name: flink-logs
+          emptyDir: {}
+  jobManager:
+    replicas: 1
+    resource:
+      memory: 2048m
+      cpu: 0.5
+  taskManager:
+    resource:
+      memory: 4096m
+      cpu: 2

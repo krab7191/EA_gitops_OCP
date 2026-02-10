@@ -1,0 +1,45 @@
+---
+# This is a TEMPLATE for creating a sealed IBM Entitlement Key secret
+# DO NOT commit the actual sealed secret to Git until you've created it with kubeseal
+#
+# To create the sealed secret:
+#
+# 1. Create the regular secret (don't apply it):
+#    oc create secret docker-registry ibm-entitlement-key \
+#      --docker-server=cp.icr.io \
+#      --docker-username=cp \
+#      --docker-password=YOUR_ENTITLEMENT_KEY \
+#      --docker-email=your-email@example.com \
+#      -n openshift-operators \
+#      --dry-run=client -o yaml > /tmp/ibm-entitlement-key.yaml
+#
+# 2. Seal it with kubeseal:
+#    kubeseal --format=yaml \
+#      --controller-namespace=sealed-secrets \
+#      --controller-name=sealed-secrets-controller \
+#      < /tmp/ibm-entitlement-key.yaml \
+#      > operators/ibm-catalogs/sealed-entitlement-key.yaml
+#
+# 3. Delete the temp file:
+#    rm /tmp/ibm-entitlement-key.yaml
+#
+# 4. Commit the sealed secret:
+#    git add operators/ibm-catalogs/sealed-entitlement-key.yaml
+#    git commit -m "Add sealed IBM entitlement key"
+#    git push
+#
+# The sealed secret will look like this (with encrypted data):
+#
+# apiVersion: bitnami.com/v1alpha1
+# kind: SealedSecret
+# metadata:
+#   name: ibm-entitlement-key
+#   namespace: openshift-operators
+# spec:
+#   encryptedData:
+#     .dockerconfigjson: AgA... (long encrypted string)
+#   template:
+#     metadata:
+#       name: ibm-entitlement-key
+#       namespace: openshift-operators
+#     type: kubernetes.io/dockerconfigjson

@@ -1,0 +1,55 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-event-automation-manager
+rules:
+  - apiGroups:
+      - eventstreams.ibm.com
+    resources:
+      - eventstreams
+      - kafkausers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - events.ibm.com
+    resources:
+      - eventprocessings
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - events.ibm.com
+    resources:
+      - eventendpointmanagements
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - flink.apache.org
+    resources:
+      - flinkdeployments
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch

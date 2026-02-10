@@ -1,0 +1,16 @@
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: ibm-eventprocessing
+  namespace: event-processing
+spec:
+  channel: v1.4
+  installPlanApproval: Automatic
+  name: ibm-eventprocessing
+  source: ibm-operator-catalog
+  sourceNamespace: openshift-marketplace
+  config:
+    env:
+      - name: ACCEPT_LICENSE
+        value: "true"

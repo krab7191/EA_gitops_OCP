@@ -1,0 +1,9 @@
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: flink-operatorgroup
+  namespace: flink
+spec:
+  targetNamespaces:
+    - flink

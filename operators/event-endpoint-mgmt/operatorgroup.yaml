@@ -1,0 +1,9 @@
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: event-endpoint-mgmt-operatorgroup
+  namespace: event-endpoint-mgmt
+spec:
+  targetNamespaces:
+    - event-endpoint-mgmt

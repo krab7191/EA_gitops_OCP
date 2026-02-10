@@ -1,0 +1,19 @@
+---
+# ROSA: update "id" values to match Azure AD role/group names
+# EP only supports one role: "user" (full access)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: production-processing-ibm-ep-user-roles
+  namespace: event-processing
+type: Opaque
+stringData:
+  user-mapping.json: |
+    {
+      "mappings": [
+        {
+          "id": "user",
+          "roles": ["user"]
+        }
+      ]
+    }

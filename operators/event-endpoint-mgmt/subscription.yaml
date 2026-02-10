@@ -1,0 +1,16 @@
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: ibm-eventendpointmanagement
+  namespace: event-endpoint-mgmt
+spec:
+  channel: v11.7
+  installPlanApproval: Automatic
+  name: ibm-eventendpointmanagement
+  source: ibm-operator-catalog
+  sourceNamespace: openshift-marketplace
+  config:
+    env:
+      - name: ACCEPT_LICENSE
+        value: "true"

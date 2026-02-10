@@ -1,0 +1,38 @@
+---
+apiVersion: events.ibm.com/v1beta1
+kind: EventProcessing
+metadata:
+  name: production-processing
+  namespace: event-processing
+  labels:
+    app.kubernetes.io/name: event-processing
+spec:
+  license:
+    accept: true
+    use: EventAutomationProduction
+    license: L-HRZF-DWHH7A
+  
+  # OIDC authentication
+  # ROSA: change site to Azure AD issuer URL, e.g. https://login.microsoftonline.com/<tenant-id>/v2.0
+  # ROSA: update authorizationClaimPointer to match Azure AD token claim path (e.g. /roles or /groups)
+  # ROSA: regenerate oidc-client-secret sealed secret with Azure AD client credentials
+  authoring:
+    authConfig:
+      authType: OIDC
+      oidcConfig:
+        authorizationClaimPointer: /roles
+        clientIDKey: client-id
+        clientSecretKey: client-secret
+        discovery: true
+        secretName: oidc-client-secret
+        site: https://keycloak-keycloak.apps.itz-3xs4bj.infra01-lb.wdc07.techzone.ibm.com/realms/FSU-EA
+    storage:
+      type: persistent-claim
+      size: 10Gi
+      # ROSA: change to gp3-csi
+      storageClassName: ocs-external-storagecluster-ceph-rbd
+      deleteClaim: false
+
+  # Flink endpoint for stream processing
+  flink:
+    endpoint: production-flink-rest.flink.svc.cluster.local:8081

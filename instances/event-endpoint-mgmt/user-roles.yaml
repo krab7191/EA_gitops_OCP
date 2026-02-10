@@ -1,0 +1,27 @@
+---
+# ROSA: update "id" values to match Azure AD role/group names
+# EEM supports three roles: admin, author, viewer
+apiVersion: v1
+kind: Secret
+metadata:
+  name: production-eem-ibm-eem-user-roles
+  namespace: event-endpoint-mgmt
+type: Opaque
+stringData:
+  user-mapping.json: |
+    {
+      "mappings": [
+        {
+          "id": "admin",
+          "roles": ["admin"]
+        },
+        {
+          "id": "author",
+          "roles": ["author"]
+        },
+        {
+          "id": "viewer",
+          "roles": ["viewer"]
+        }
+      ]
+    }
