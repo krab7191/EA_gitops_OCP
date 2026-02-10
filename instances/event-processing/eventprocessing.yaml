@@ -10,7 +10,7 @@ spec:
   license:
     accept: true
     use: EventAutomationProduction
-    license: L-HRZF-DWHH7A
+    license: L-CYBH-K48BZQ
   
   # OIDC authentication
   # ROSA: change site to Azure AD issuer URL, e.g. https://login.microsoftonline.com/<tenant-id>/v2.0
