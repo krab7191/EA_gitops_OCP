@@ -41,7 +41,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) for complete installation instructions.
 `oc get routes -n event-streams && echo "---" && oc get routes -n event-processing && echo "---" && oc get routes -n event-endpoint-mgmt`
 
 ### Get kafka admin password
-`oc get secret es-prod-admin -n event-streams -o jsonpath='{.data.password}' | base64 -d`
+`oc get secret es-prod-admin -n event-streams -o jsonpath='{.data.password}' | base64 -d && echo ""`
 
 ## Troubleshooting
 
