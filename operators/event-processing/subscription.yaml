@@ -5,7 +5,7 @@ metadata:
   name: ibm-eventprocessing
   namespace: event-processing
 spec:
-  channel: v1.2
+  channel: v1.3
   installPlanApproval: Automatic
   name: ibm-eventprocessing
   source: ibm-operator-catalog
