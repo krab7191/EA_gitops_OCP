@@ -1,10 +1,12 @@
 # Installation Guide
 
+These instructions are for **ROKS** (IBM Cloud) with Keycloak OIDC. For ROSA (AWS) with Azure AD, see [ROSA-INSTALL-SEALED-SECRETS.md](./ROSA-INSTALL-SEALED-SECRETS.md).
+
 ## Prerequisites
 
-- ROKS/ROSA cluster with cluster-admin access
+- ROKS cluster with cluster-admin access
 - IBM Entitlement Key from myibm.ibm.com
-- OIDC Provider (Keycloak or Azure AD): Issuer URL, Client ID, Client Secret
+- Keycloak instance with a realm, confidential client, Client ID, and Client Secret
 - Tools: `oc`, `git`, `kubeseal`
 
 Install kubeseal:
@@ -19,8 +21,6 @@ brew install kubeseal  # macOS
 Fork this repo, then update the `repoURL` in these files to point to your fork:
 - `argocd-app-of-apps.yaml`
 - All files in `argocd-apps/`
-
-Look for the `# ROSA:` comments in the instance files if deploying to ROSA (storage class, OIDC config).
 
 ### 2. Create Sealed Secrets
 
@@ -40,14 +40,11 @@ kubeseal --format=yaml --controller-namespace=sealed-secrets \
 
 **OIDC secrets (Event Processing & Event Endpoint Management):**
 ```bash
-# For Keycloak:
-export OIDC_ISSUER_URL="https://keycloak.example.com/realms/your-realm"
-# For Azure AD:
-# export OIDC_ISSUER_URL="https://login.microsoftonline.com/<tenant-id>/v2.0"
-
+export KEYCLOAK_URL="https://keycloak.example.com"
+export KEYCLOAK_REALM="your-realm"
 export OIDC_CLIENT_ID="your-client-id"
-export OIDC_CLIENT_SECRET="your-secret"
-export DISCOVERY_URL="${OIDC_ISSUER_URL}/.well-known/openid-configuration"
+export OIDC_CLIENT_SECRET="your-client-secret"
+export DISCOVERY_URL="${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration"
 
 # Event Processing
 oc create secret generic oidc-client-secret \
@@ -72,15 +69,9 @@ kubeseal --format=yaml --controller-namespace=sealed-secrets \
 > The operator generates credentials from the KafkaUser CR (`admin-user.yaml`).
 > No sealed secret is needed — see [Retrieving Event Streams SCRAM credentials](#5-access) below.
 
-### 3. Configure OIDC Provider
+### 3. Configure Keycloak
 
-In your OIDC provider (Keycloak or Azure AD), configure the client:
-
-**Valid Redirect URIs** (add after deployment when you know the routes, or use wildcards):
-```
-https://<ep-route>/*
-https://<eem-route>/*
-```
+In your Keycloak realm, configure the client:
 
 **Client Roles** — create these roles on the OIDC client:
 
@@ -95,9 +86,15 @@ For Event Endpoint Management:
 Assign appropriate roles to your users.
 
 **Token Mapper** — ensure roles appear in the token:
-- Add a "User Client Role" mapper
+- Add a "User Client Role" mapper (Mappers tab on the client)
 - Set Token Claim Name to `roles`
 - Enable for both ID token and access token
+
+**Redirect URIs** — add after deployment when you know the routes:
+```
+https://<ep-route>/callback
+https://<eem-route>/callback
+```
 
 ### 4. Commit and Push
 
@@ -152,4 +149,4 @@ echo "https://$(oc get route production-processing-ibm-ep-rt -n event-processing
 echo "https://$(oc get route production-eem-ibm-eem-manager -n event-endpoint-mgmt -o jsonpath='{.spec.host}')"
 ```
 
-> After getting the EP and EEP routes, add them as Valid Redirect URIs in your OIDC provider if you haven't already.
+> After getting the EP and EEM routes, add them as Valid Redirect URIs in Keycloak (Clients → your client → Valid Redirect URIs) if you haven't already.

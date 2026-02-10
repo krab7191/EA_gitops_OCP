@@ -1,13 +1,14 @@
-# ROSA Installation Guide (Sealed Secrets + Keycloak)
+# ROSA Installation Guide (Sealed Secrets + Azure AD OIDC)
 
 ## Prerequisites
 
 1. **ROSA cluster** with cluster-admin access (OpenShift 4.17+)
 2. **IBM Entitlement Key** from [myibm.ibm.com/products-services/containerlibrary](https://myibm.ibm.com/products-services/containerlibrary)
-3. **Keycloak instance** (for Event Processing and Event Endpoint Management) with:
-   - Realm created
-   - Client configured (confidential)
-   - Client ID and Secret
+3. **Azure AD App Registration** (for Event Processing and Event Endpoint Management) with:
+   - Tenant ID
+   - App Registration with Client ID and Client Secret
+   - Redirect URIs configured (added post-install)
+   - App Roles defined: `user` (for EP), `admin`, `author`, `viewer` (for EEM)
 4. **CLI tools**: `oc`, `git`, `kubeseal`
 
 ## Setup
@@ -81,23 +82,22 @@ kubeseal --format=yaml \
 rm /tmp/ibm-entitlement-key.yaml
 ```
 
-#### Keycloak OIDC Secrets (Event Processing & Event Endpoint Management)
+#### Azure AD OIDC Secrets (Event Processing & Event Endpoint Management)
 
 > **Note:** Event Streams uses SCRAM-SHA-512 for Admin UI authentication — no OIDC secret needed.
 > The operator auto-generates SCRAM credentials at deploy time. See [Post-Install](#post-install) for how to retrieve them.
 
 ```bash
-# Set Keycloak values
-export KEYCLOAK_URL="https://keycloak.example.com"
-export KEYCLOAK_REALM="event-automation"
-export KEYCLOAK_CLIENT_ID="event-automation"
-export KEYCLOAK_CLIENT_SECRET="your-client-secret"
-export DISCOVERY_URL="${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration"
+# Set Azure AD values
+export AZURE_TENANT_ID="your-tenant-id"
+export AZURE_CLIENT_ID="your-app-registration-client-id"
+export AZURE_CLIENT_SECRET="your-app-registration-client-secret"
+export DISCOVERY_URL="https://login.microsoftonline.com/${AZURE_TENANT_ID}/v2.0/.well-known/openid-configuration"
 
 # Event Processing
 oc create secret generic oidc-client-secret \
-  --from-literal=client-id="${KEYCLOAK_CLIENT_ID}" \
-  --from-literal=client-secret="${KEYCLOAK_CLIENT_SECRET}" \
+  --from-literal=client-id="${AZURE_CLIENT_ID}" \
+  --from-literal=client-secret="${AZURE_CLIENT_SECRET}" \
   --from-literal=discovery-url="${DISCOVERY_URL}" \
   -n event-processing \
   --dry-run=client -o yaml | \
@@ -108,8 +108,8 @@ kubeseal --format=yaml \
 
 # Event Endpoint Management
 oc create secret generic oidc-client-secret \
-  --from-literal=client-id="${KEYCLOAK_CLIENT_ID}" \
-  --from-literal=client-secret="${KEYCLOAK_CLIENT_SECRET}" \
+  --from-literal=client-id="${AZURE_CLIENT_ID}" \
+  --from-literal=client-secret="${AZURE_CLIENT_SECRET}" \
   --from-literal=discovery-url="${DISCOVERY_URL}" \
   -n event-endpoint-mgmt \
   --dry-run=client -o yaml | \
@@ -204,16 +204,16 @@ echo "https://$(oc get route production-cluster-ibm-es-ui -n event-streams -o js
 
 Use these credentials to log into the Event Streams Admin UI.
 
-### Add Keycloak Redirect URIs (Event Processing & Event Endpoint Management)
+### Add Azure AD Redirect URIs (Event Processing & Event Endpoint Management)
 
-Get the routes and add them to your Keycloak client:
+Get the routes and add them to your Azure AD App Registration:
 
 ```bash
 echo "Event Processing: https://$(oc get route production-processing-ibm-ep-ui -n event-processing -o jsonpath='{.spec.host}')/callback"
 echo "Event Endpoint Management: https://$(oc get route production-eem-ibm-eem-manager -n event-endpoint-mgmt -o jsonpath='{.spec.host}')/callback"
 ```
 
-Add these to Keycloak → Clients → event-automation → Valid Redirect URIs
+Add these in Azure Portal → App Registrations → your app → Authentication → Redirect URIs
 
 ## Troubleshooting
 
@@ -241,4 +241,4 @@ oc get events -n event-streams --sort-by='.lastTimestamp' | tail -20
 ## Additional Resources
 
 - [Sealed Secrets Setup](./SEALED-SECRETS-SETUP.md) - Detailed sealed secrets guide
-- [Keycloak Setup](./KEYCLOAK-SETUP.md) - Keycloak configuration details
+- [Azure AD OIDC Setup](./AZURE-AD-OIDC-SETUP.md) - Azure AD configuration details
