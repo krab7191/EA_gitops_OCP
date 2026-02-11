@@ -4,6 +4,8 @@ kind: EventEndpointManagement
 metadata:
   name: production-eem
   namespace: event-endpoint-mgmt
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/name: event-endpoint-management
 spec:
