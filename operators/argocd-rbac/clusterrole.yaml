@@ -33,6 +33,7 @@ rules:
       - events.ibm.com
     resources:
       - eventendpointmanagements
+      - eventgateways
     verbs:
       - create
       - delete
