@@ -10,7 +10,7 @@ spec:
   license:
     accept: true
     use: EventAutomationProduction
-    license: L-AUKS-FKVXVL
+    license: L-CYBH-K48BZQ
     metric: VIRTUAL_PROCESSOR_CORE
   
   # Manager component - API catalog and governance

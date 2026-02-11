@@ -5,7 +5,7 @@ metadata:
   name: ibm-eventstreams
   namespace: event-streams
 spec:
-  channel: v3.7
+  channel: v3.8
   installPlanApproval: Automatic
   name: ibm-eventstreams
   source: ibm-operator-catalog
