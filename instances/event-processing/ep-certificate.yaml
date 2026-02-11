@@ -1,0 +1,19 @@
+---
+# cert-manager Certificate for the EP UI route
+# Sync-wave 0: ArgoCD waits for this to be Ready (secret created)
+# before applying the EP CR in wave 1
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ep-ui-tls
+  namespace: event-processing
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  secretName: ep-ui-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    # ROSA: update to match your cluster's apps domain
+    - production-processing-ibm-ep-rt-event-processing.apps.itz-3xs4bj.infra01-lb.wdc07.techzone.ibm.com

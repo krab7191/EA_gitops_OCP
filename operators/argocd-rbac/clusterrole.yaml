@@ -54,3 +54,16 @@ rules:
       - patch
       - update
       - watch
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - clusterissuers
+      - certificates
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch

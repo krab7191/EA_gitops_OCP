@@ -6,17 +6,24 @@ metadata:
   namespace: event-processing
   labels:
     app.kubernetes.io/name: event-processing
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   license:
     accept: true
     use: EventAutomationProduction
     license: L-CYBH-K48BZQ
-  
+
   # OIDC authentication
   # ROSA: change site to Azure AD issuer URL, e.g. https://login.microsoftonline.com/<tenant-id>/v2.0
   # ROSA: update authorizationClaimPointer to match Azure AD token claim path (e.g. /roles or /groups)
   # ROSA: regenerate oidc-client-secret sealed secret with Azure AD client credentials
   authoring:
+    # TLS: use Let's Encrypt cert for the UI route (switches from passthrough to reencrypt)
+    # The ep-ui-tls secret is created by the Certificate resource in ep-certificate.yaml
+    tls:
+      ui:
+        secretName: ep-ui-tls
     authConfig:
       authType: OIDC
       oidcConfig:
