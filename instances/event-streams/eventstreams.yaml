@@ -12,26 +12,24 @@ spec:
     accept: true
     use: EventAutomationProduction
     license: L-CYBH-K48BZQ
-  
+
   # Administrator API access
   adminApi: {}
-  
+
   # REST Producer API
   restProducer: {}
-  
+
   # Admin UI with SCRAM-SHA-512 authentication
   adminUI:
     authentication:
       - type: scram-sha-512
-  
+
   # Apache Kafka configuration
   strimziOverrides:
     kafka:
-      replicas: 3
       authorization:
         type: simple
       config:
-        inter.broker.protocol.version: "3.7"
         log.cleaner.threads: 6
         num.io.threads: 24
         num.network.threads: 9
@@ -52,49 +50,56 @@ spec:
           tls: true
           authentication:
             type: tls
+        - name: intscram
+          port: 9095
+          type: internal
+          tls: true
+          authentication:
+            type: scram-sha-512
       metricsConfig:
         type: jmxPrometheusExporter
         valueFrom:
           configMapKeyRef:
             key: kafka-metrics-config.yaml
             name: metrics-config
-      storage:
-        type: persistent-claim
-        size: 100Gi
-        # ROSA: change to gp3-csi
-        class: ocs-external-storagecluster-ceph-rbd
-        deleteClaim: false
-      resources:
-        requests:
-          memory: 4Gi
-          cpu: 2000m
-        limits:
-          memory: 4Gi
-          cpu: 2000m
 
-    # ZooKeeper configuration
-    zookeeper:
-      replicas: 3
-      metricsConfig:
-        type: jmxPrometheusExporter
-        valueFrom:
-          configMapKeyRef:
-            key: zookeeper-metrics-config.yaml
-            name: metrics-config
-      storage:
-        type: persistent-claim
-        size: 10Gi
-        # ROSA: change to gp3-csi
-        class: ocs-external-storagecluster-ceph-rbd
-        deleteClaim: false
-      resources:
-        requests:
-          memory: 2Gi
-          cpu: 1000m
-        limits:
-          memory: 2Gi
-          cpu: 1000m
-  
+    # KRaft node pools
+    nodePools:
+      - name: controller
+        replicas: 3
+        roles:
+          - controller
+        storage:
+          type: persistent-claim
+          size: 10Gi
+          # ROSA: change to gp3-csi
+          class: ocs-external-storagecluster-ceph-rbd
+          deleteClaim: false
+        resources:
+          requests:
+            memory: 2Gi
+            cpu: 1000m
+          limits:
+            memory: 2Gi
+            cpu: 1000m
+      - name: broker
+        replicas: 3
+        roles:
+          - broker
+        storage:
+          type: persistent-claim
+          size: 100Gi
+          # ROSA: change to gp3-csi
+          class: ocs-external-storagecluster-ceph-rbd
+          deleteClaim: false
+        resources:
+          requests:
+            memory: 4Gi
+            cpu: 2000m
+          limits:
+            memory: 4Gi
+            cpu: 2000m
+
   # # Kafka Connect
   # kafkaConnect:
   #   replicas: 2
@@ -118,7 +123,7 @@ spec:
   #     limits:
   #       memory: 2Gi
   #       cpu: 1000m
-  
+
   # Collector for metrics
   collector:
     resources:
@@ -152,9 +157,3 @@ data:
       labels:
         clientId: "$3"
         broker: "$4:$5"
-  zookeeper-metrics-config.yaml: |
-    lowercaseOutputName: true
-    rules:
-    - pattern: "org.apache.ZooKeeperService<name0=(.+)><>(\\w+)"
-      name: "zookeeper_$2"
-      type: GAUGE
