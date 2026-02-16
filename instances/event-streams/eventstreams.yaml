@@ -52,12 +52,6 @@ spec:
           tls: true
           authentication:
             type: tls
-        - name: intscram
-          port: 9095
-          type: internal
-          tls: true
-          authentication:
-            type: scram-sha-512
       metricsConfig:
         type: jmxPrometheusExporter
         valueFrom:
