@@ -31,7 +31,7 @@ metadata:
   namespace: event-processing
 rules:
 - apiGroups: [""]
-  resources: ["configmaps"]
+  resources: ["secrets"]
   verbs: ["create","get","update","patch"]
 
 ---
@@ -57,7 +57,7 @@ metadata:
   namespace: event-endpoint-mgmt
 rules:
 - apiGroups: [""]
-  resources: ["configmaps"]
+  resources: ["secrets"]
   verbs: ["create","get","update","patch"]
 
 ---
@@ -83,7 +83,7 @@ metadata:
   namespace: flink
 rules:
 - apiGroups: [""]
-  resources: ["configmaps"]
+  resources: ["secrets"]
   verbs: ["create","get","update","patch"]
 
 ---
