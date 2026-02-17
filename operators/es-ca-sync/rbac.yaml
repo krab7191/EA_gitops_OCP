@@ -1,0 +1,102 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: es-ca-reader
+  namespace: event-streams
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: es-ca-reader
+  namespace: event-streams
+subjects:
+- kind: ServiceAccount
+  name: es-ca-sync
+  namespace: event-streams
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: es-ca-reader
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cm-writer
+  namespace: event-processing
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["create","get","update","patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cm-writer
+  namespace: event-processing
+subjects:
+- kind: ServiceAccount
+  name: es-ca-sync
+  namespace: event-streams
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cm-writer
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cm-writer
+  namespace: event-endpoint-mgmt
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["create","get","update","patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cm-writer
+  namespace: event-endpoint-mgmt
+subjects:
+- kind: ServiceAccount
+  name: es-ca-sync
+  namespace: event-streams
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cm-writer
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cm-writer
+  namespace: flink
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["create","get","update","patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cm-writer
+  namespace: flink
+subjects:
+- kind: ServiceAccount
+  name: es-ca-sync
+  namespace: event-streams
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cm-writer

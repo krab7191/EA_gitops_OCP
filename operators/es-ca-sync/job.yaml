@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: es-ca-sync
+  namespace: event-streams
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: es-ca-sync
+      containers:
+      - name: sync
+        image: registry.access.redhat.com/ubi9/ubi-minimal
+        command: ["/bin/bash","-lc"]
+        args:
+        - |
+          set -e
+          ca=$(oc get secret es-prod-cluster-ca-cert -n event-streams -o jsonpath='{.data.ca\.crt}' | base64 -d)
+          for ns in event-processing event-endpoint-mgmt flink; do
+            oc -n $ns apply -f - <<EOF
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: es-cluster-ca
+              data:
+                es-ca.crt: |
+              $(echo "$ca" | sed 's/^/    /')
+              EOF
+          done
