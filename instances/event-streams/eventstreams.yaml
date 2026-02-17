@@ -118,19 +118,8 @@ spec:
   #       memory: 2Gi
   #       cpu: 1000m
 
-  # Deprected in 11.1+
-  # Collector for metrics
-  # collector:
-  #   resources:
-  #     requests:
-  #       memory: 512Mi
-  #       cpu: 100m
-  #     limits:
-  #       memory: 512Mi
-  #       cpu: 500m
-
-  # NOTE: adds latency; enabled for Producers tab in UI
-  kafkaProxy: {}
+  # Producer metrics collector
+  collector: {}
 ---
 # Metrics ConfigMap for Kafka
 apiVersion: v1
