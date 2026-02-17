@@ -24,9 +24,9 @@ spec:
     tls:
       ui:
         secretName: ep-ui-tls
-      # trustedCertificates:
-      #   - secretName: es-cluster-ca
-      #     certificate: es-ca.crt
+      trustedCertificates:
+        - secretName: es-cluster-ca
+          certificate: es-ca.crt
     authConfig:
       authType: OIDC
       oidcConfig:
