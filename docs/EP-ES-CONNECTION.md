@@ -7,6 +7,8 @@
   authentication. SCRAM-authenticated users get a 403 error. All credentials must be created
   via gitops (KafkaUser CRs) or `oc` CLI instead.
 
+- **Note** EP MUST trust the ES cluster CA for internal TLS to work.
+
 ## Connection Options
 
 Event Processing supports both internal and external SCRAM-SHA-512 connections:
