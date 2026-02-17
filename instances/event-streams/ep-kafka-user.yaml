@@ -1,3 +1,4 @@
+# oc get kafkauser -n event-streams
 ---
 apiVersion: eventstreams.ibm.com/v1beta2
 kind: KafkaUser

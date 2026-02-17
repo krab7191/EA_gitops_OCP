@@ -82,7 +82,7 @@ spec:
           - broker
         storage:
           type: persistent-claim
-          size: 100Gi
+          size: 20Gi
           # ROSA: change to gp3-csi
           class: ocs-external-storagecluster-ceph-rbd
           deleteClaim: false
@@ -93,30 +93,6 @@ spec:
           limits:
             memory: 4Gi
             cpu: 2000m
-
-  # # Kafka Connect
-  # kafkaConnect:
-  #   replicas: 2
-  #   build:
-  #     output:
-  #       type: docker
-  #       image: image-registry.openshift-image-registry.svc:5000/event-streams/kafka-connect:latest
-  #     plugins: []
-  #   config:
-  #     group.id: connect-cluster
-  #     offset.storage.topic: connect-cluster-offsets
-  #     config.storage.topic: connect-cluster-configs
-  #     status.storage.topic: connect-cluster-status
-  #     config.storage.replication.factor: 3
-  #     offset.storage.replication.factor: 3
-  #     status.storage.replication.factor: 3
-  #   resources:
-  #     requests:
-  #       memory: 2Gi
-  #       cpu: 1000m
-  #     limits:
-  #       memory: 2Gi
-  #       cpu: 1000m
 
   # Producer metrics collector
   collector: {}
