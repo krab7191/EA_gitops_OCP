@@ -6,35 +6,31 @@
   "Generate credentials" feature requires IBM Cloud Pak foundational services (IAM)
   authentication. SCRAM-authenticated users get a 403 error. All credentials must be created
   via gitops (KafkaUser CRs) or `oc` CLI instead.
-- **EP event source wizard validates URL before allowing cert upload.** The wizard attempts to
-  connect to the Kafka bootstrap server immediately when you enter the URL, before you can
-  configure certificates or authentication. This means internal mTLS listeners (port 9093)
-  fail because EP has no client cert to present. Use the external SCRAM listener instead.
 
-## Connection Steps
+## Connection Options
 
-All credentials and certificates are retrieved via CLI — nothing is done through the ES UI.
+Event Processing supports both internal and external SCRAM-SHA-512 connections:
 
-### 1. Get the External Bootstrap URL
+1. **Internal SCRAM (Recommended)** - Keeps traffic within cluster
+2. **External SCRAM** - For external access or testing
+
+---
+
+## Option 1: Internal SCRAM Connection (Recommended)
+
+### 1. Get the Internal Bootstrap URL
 
 ```bash
 oc get eventstreams es-prod -n event-streams \
-  -o jsonpath='{.status.kafkaListeners[?(@.name=="external")].bootstrapServers}' && echo ""
+  -o jsonpath='{.status.kafkaListeners[?(@.name=="intscram")].bootstrapServers}' && echo ""
 ```
 
 Expected output:
 ```
-es-prod-kafka-bootstrap-event-streams.apps.<cluster-domain>:443
+es-prod-kafka-bootstrap.event-streams.svc:9093
 ```
 
-### 2. Get the Cluster CA Certificate
-
-```bash
-oc get secret es-prod-cluster-ca-cert -n event-streams \
-  -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/ca.crt
-```
-
-### 3. Get SCRAM Credentials
+### 2. Get SCRAM Credentials
 
 The `es-prod-admin` KafkaUser is provisioned via gitops (`instances/event-streams/admin-user.yaml`).
 The operator auto-generates the password.
@@ -46,37 +42,40 @@ oc get secret es-prod-admin -n event-streams \
   -o jsonpath='{.data.password}' | base64 -d && echo ""
 ```
 
-### 4. Configure Event Source in EP
+### 3. Configure Event Source in EP
 
 1. Open the Event Processing UI
 2. Create a new flow (or edit existing)
 3. Add an **Event source** node
-4. Enter the **external** bootstrap URL from step 1
-5. Click **Next** to proceed to **Access credentials**
-6. Select **SCRAM-SHA-512** as the security mechanism
-7. Enter username `es-prod-admin` and the password from step 3
-8. Upload the CA certificate (`/tmp/ca.crt`) if prompted
+4. Enter the **internal** bootstrap URL: `es-prod-kafka-bootstrap.event-streams.svc:9093`
+5. Click **Accept certificates** when prompted to trust the cluster CA certificate
+6. Click **Next** to proceed to **Access credentials**
+7. Select **SCRAM-SHA-512** as the security mechanism
+8. Enter username `es-prod-admin` and the password from step 2
 9. Select your topic and continue configuring the flow
 
-## Internal mTLS Certificates (Reference)
+**Benefits:**
+- Traffic stays within the cluster (no external route)
+- Better performance (no route overhead)
 
-A dedicated TLS KafkaUser (`es-prod-ep-user`) is provisioned via gitops
-(`instances/event-streams/ep-kafka-user.yaml`). These can be used if a future EP version
-allows certificate configuration before URL validation, or for non-UI Kafka clients.
+---
 
-Retrieve the client certificates:
+## Option 2: External SCRAM Connection
+
+Use this option for external access or testing from outside the cluster.
+
+### 1. Get the External Bootstrap URL
+
 ```bash
-oc get secret es-prod-ep-user -n event-streams \
-  -o jsonpath='{.data.user\.crt}' | base64 -d > /tmp/user.crt
-oc get secret es-prod-ep-user -n event-streams \
-  -o jsonpath='{.data.user\.key}' | base64 -d > /tmp/user.key
-oc get secret es-prod-cluster-ca-cert -n event-streams \
-  -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/ca.crt
-cat /tmp/user.key /tmp/user.crt > /tmp/keystore.pem
+oc get eventstreams es-prod -n event-streams \
+  -o jsonpath='{.status.kafkaListeners[?(@.name=="extscram")].bootstrapServers}' && echo ""
 ```
 
-To use with the internal listener:
-- **Server:** `es-prod-kafka-bootstrap.event-streams.svc:9093`
-- **Auth:** Mutual TLS
-- **Server cert:** `ca.crt`
-- **Client cert:** `keystore.pem`
+Expected output:
+```
+es-prod-kafka-extscram-bootstrap-event-streams.apps.<cluster-domain>:443
+```
+
+### 2-3. Follow Same Steps as Internal
+
+Use the same SCRAM credentials from Option 1, but with the external bootstrap URL in step 4.
