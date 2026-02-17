@@ -30,11 +30,18 @@ spec:
                    -o go-template='{{index .data "ca.crt" | base64decode}}')"
               printf "%s" "$CA" > /tmp/es-ca.crt
 
-              # Copy default Java cacerts and add ES CA into it
+              # Extract EP root CA cert
+              EP_CA="$(kubectl -n event-processing get secret production-processing-ibm-ep-root-ca \
+                   -o go-template='{{index .data "ca.crt" | base64decode}}')"
+              printf "%s" "$EP_CA" > /tmp/ep-root-ca.crt
+
+              # Build JKS truststore: default cacerts + ES CA + EP root CA
               cp "$JAVA_HOME/lib/security/cacerts" /tmp/truststore.jks
               chmod 644 /tmp/truststore.jks
               keytool -keystore /tmp/truststore.jks -alias es-cluster-ca -import \
                 -file /tmp/es-ca.crt -noprompt -storepass changeit -trustcacerts
+              keytool -keystore /tmp/truststore.jks -alias ep-root-ca -import \
+                -file /tmp/ep-root-ca.crt -noprompt -storepass changeit -trustcacerts
 
               # Push PEM secret and JKS truststore secret to each namespace
               for NS in event-processing event-endpoint-mgmt flink; do

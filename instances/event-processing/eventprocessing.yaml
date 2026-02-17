@@ -27,6 +27,27 @@ spec:
       trustedCertificates:
         - secretName: es-cluster-ca
           certificate: es-ca.crt
+    template:
+      pod:
+        spec:
+          containers:
+            - name: backend
+              env:
+                - name: JAVA_TOOL_OPTIONS
+                  value: >-
+                    -Djavax.net.ssl.trustStore=/opt/ibm/sp-backend/certs/truststore.jks
+                    -Djavax.net.ssl.trustStorePassword=changeit
+              volumeMounts:
+                - mountPath: /opt/ibm/sp-backend/certs
+                  name: truststore
+                  readOnly: true
+          volumes:
+            - name: truststore
+              secret:
+                secretName: ssl-truststore
+                items:
+                  - key: truststore.jks
+                    path: truststore.jks
     authConfig:
       authType: OIDC
       oidcConfig:
