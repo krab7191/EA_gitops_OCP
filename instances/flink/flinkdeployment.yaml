@@ -21,6 +21,12 @@ spec:
     restart-strategy.failure-rate.failure-rate-interval: '10 min'
     restart-strategy.failure-rate.delay: '30 s'
     table.exec.source.idle-timeout: '30 s'
+    env.java.opts.taskmanager: >-
+      -Djavax.net.ssl.trustStore=/certs/truststore.jks
+      -Djavax.net.ssl.trustStorePassword=changeit
+    env.java.opts.jobmanager: >-
+      -Djavax.net.ssl.trustStore=/certs/truststore.jks
+      -Djavax.net.ssl.trustStorePassword=changeit
   podTemplate:
     apiVersion: v1
     kind: Pod
@@ -32,9 +38,18 @@ spec:
           volumeMounts:
             - name: flink-logs
               mountPath: /opt/flink/log
+            - name: truststore
+              mountPath: /certs
+              readOnly: true
       volumes:
         - name: flink-logs
           emptyDir: {}
+        - name: truststore
+          secret:
+            secretName: ssl-truststore
+            items:
+              - key: truststore.jks
+                path: truststore.jks
   jobManager:
     replicas: 1
     resource:

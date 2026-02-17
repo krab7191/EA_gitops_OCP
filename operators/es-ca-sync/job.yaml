@@ -14,17 +14,32 @@ spec:
       serviceAccountName: es-ca-sync
       containers:
         - name: sync
-          image: bitnami/kubectl:latest
+          image: registry.access.redhat.com/ubi9/openjdk-21:latest
           command: ["/bin/sh","-c"]
           args:
             - |
               set -eu
+
+              # Install kubectl
+              curl -sLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x /tmp/kubectl
+              export PATH="/tmp:$PATH"
+
+              # Extract ES cluster CA cert
               CA="$(kubectl -n event-streams get secret es-prod-cluster-ca-cert \
                    -o go-template='{{index .data "ca.crt" | base64decode}}')"
-              tmp=/tmp/es-ca.crt
-              printf "%s" "$CA" > "$tmp"
+              printf "%s" "$CA" > /tmp/es-ca.crt
+
+              # Create JKS truststore from the CA cert
+              keytool -keystore /tmp/truststore.jks -alias es-cluster-ca -import \
+                -file /tmp/es-ca.crt -noprompt -storepass changeit -trustcacerts
+
+              # Push PEM secret and JKS truststore secret to each namespace
               for NS in event-processing event-endpoint-mgmt flink; do
                 kubectl -n "$NS" create secret generic es-cluster-ca \
-                  --from-file=es-ca.crt="$tmp" \
+                  --from-file=es-ca.crt=/tmp/es-ca.crt \
+                  --dry-run=client -o yaml | kubectl -n "$NS" apply -f -
+                kubectl -n "$NS" create secret generic ssl-truststore \
+                  --from-file=truststore.jks=/tmp/truststore.jks \
                   --dry-run=client -o yaml | kubectl -n "$NS" apply -f -
               done
