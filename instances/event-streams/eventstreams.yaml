@@ -40,7 +40,7 @@ spec:
       listeners:
         - name: extscram
           port: 9094
-          type: external
+          type: route
           tls: true
           authentication:
             type: scram-sha-512
