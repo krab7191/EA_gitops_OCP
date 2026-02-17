@@ -32,6 +32,7 @@ spec:
 
               # Copy default Java cacerts and add ES CA into it
               cp "$JAVA_HOME/lib/security/cacerts" /tmp/truststore.jks
+              chmod 644 /tmp/truststore.jks
               keytool -keystore /tmp/truststore.jks -alias es-cluster-ca -import \
                 -file /tmp/es-ca.crt -noprompt -storepass changeit -trustcacerts
 
