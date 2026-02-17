@@ -24,7 +24,7 @@ spec:
               tmp=/tmp/es-ca.crt
               printf "%s" "$CA" > "$tmp"
               for NS in event-processing event-endpoint-mgmt flink; do
-                kubectl -n "$NS" create configmap es-cluster-ca \
+                kubectl -n "$NS" create secret generic es-cluster-ca \
                   --from-file=es-ca.crt="$tmp" \
                   --dry-run=client -o yaml | kubectl -n "$NS" apply -f -
               done

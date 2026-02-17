@@ -24,6 +24,10 @@ spec:
     tls:
       ui:
         secretName: ep-ui-tls
+      kafka:
+        trustedCertificates:
+          - secretName: es-cluster-ca
+            certificate: es-ca.crt
     authConfig:
       authType: OIDC
       oidcConfig:
