@@ -30,7 +30,8 @@ spec:
                    -o go-template='{{index .data "ca.crt" | base64decode}}')"
               printf "%s" "$CA" > /tmp/es-ca.crt
 
-              # Create JKS truststore from the CA cert
+              # Copy default Java cacerts and add ES CA into it
+              cp "$JAVA_HOME/lib/security/cacerts" /tmp/truststore.jks
               keytool -keystore /tmp/truststore.jks -alias es-cluster-ca -import \
                 -file /tmp/es-ca.crt -noprompt -storepass changeit -trustcacerts
 
