@@ -38,20 +38,14 @@ spec:
         default.replication.factor: 3
         min.insync.replicas: 2
       listeners:
-        - name: external
+        - name: extscram
           port: 9094
-          type: route
+          type: external
           tls: true
           authentication:
             type: scram-sha-512
-        - name: tls
-          port: 9093
-          type: internal
-          tls: true
-          authentication:
-            type: tls
         - name: intscram
-          port: 9095
+          port: 9093
           type: internal
           tls: true
           authentication:
