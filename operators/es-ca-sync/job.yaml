@@ -59,7 +59,7 @@ spec:
               # TLS handshake chain, so clients must trust it explicitly via the JKS.
               echo "Extracting ES cluster CA cert..."
               kcurl "${API}/api/v1/namespaces/event-streams/secrets/es-prod-cluster-ca-cert" \
-                | tr -d '\n' \
+                | tr -d '\n ' \
                 | grep -Eo '"ca\.crt":"[^"]*"' \
                 | cut -d'"' -f4 \
                 | base64 -d > /tmp/es-ca.crt
@@ -76,7 +76,7 @@ spec:
               if kcurl "${API}/api/v1/namespaces/event-processing/secrets/production-processing-ibm-ep-root-ca" > /dev/null 2>&1; then
                 echo "Adding EP root CA to truststore..."
                 kcurl "${API}/api/v1/namespaces/event-processing/secrets/production-processing-ibm-ep-root-ca" \
-                  | tr -d '\n' \
+                  | tr -d '\n ' \
                   | grep -Eo '"ca\.crt":"[^"]*"' \
                   | cut -d'"' -f4 \
                   | base64 -d > /tmp/ep-root-ca.crt
