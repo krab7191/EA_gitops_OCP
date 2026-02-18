@@ -7,79 +7,125 @@
   authentication. SCRAM-authenticated users get a 403 error. All credentials must be created
   via gitops (KafkaUser CRs) or `oc` CLI instead.
 
-- **Note** EP MUST trust the ES cluster CA for internal TLS to work.
+- **ES 12.2.x TLS bug — manual cert replacement required.** ES 12.2.x brokers send only the
+  leaf certificate during the TLS handshake (`tls.pemChainIncluded=false`), not the full chain.
+  EP's Kafka client uses `ssl.truststore.type=PEM` and stores whichever cert it receives from
+  the bootstrap broker. When the Kafka client then connects to individual broker routes (each
+  with a different leaf cert), PKIX validation fails. The JKS truststore and
+  `trustedCertificates` in the EP CR do not fix this — they only affect EP's Vert.x SSL
+  context, not the Kafka client. See [workaround below](#es-122x-tls-workaround).
+
+- **Internal SCRAM (9093) not usable for EP event sources.** The EP event source wizard
+  validates the bootstrap URL before accepting credentials. The internal SCRAM listener
+  returns "Connection credential not required" at the introspection step.
+
+- **EP UI flow preview may not show events.** The CollectSink websocket (Flink → EP, port
+  8887) may be blocked by network policies between the `flink` and `event-processing`
+  namespaces. The Flink job processes events correctly — verify by checking the sink topic
+  in the ES UI instead of relying on the EP flow canvas preview.
+
+---
+
+## ES 12.2.x TLS Workaround
+
+After configuring an event source or sink in the EP wizard, the generated SQL will contain
+`ssl.truststore.certificates` set to the bootstrap broker's leaf cert. This must be manually
+replaced with the cluster CA cert so EP's Kafka client can validate all per-broker route certs.
+
+### 1. Get the cluster CA cert
+
+```bash
+oc get secret es-prod-cluster-ca-cert -n event-streams \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d
+```
+
+Copy the full PEM output (`-----BEGIN CERTIFICATE-----` through `-----END CERTIFICATE-----`).
+
+### 2. Edit the event source SQL
+
+In the EP flow canvas, click the event source node → **Edit** → **Preview SQL**.
+
+Find the `ssl.truststore.certificates` property and replace the leaf cert with the CA cert:
+
+```sql
+'properties.ssl.truststore.certificates' = '-----BEGIN CERTIFICATE-----
+<paste cluster CA cert here>
+-----END CERTIFICATE-----
+',
+```
+
+Submit the updated SQL.
+
+### 3. Repeat for every sink
+
+EP auto-fills the leaf cert for every new event source and sink. Repeat step 2 for each
+sink node's SQL.
+
+### Notes
+
+- This replacement must be done manually each time an event source or sink is created.
+  There is no GitOps-friendly way to pre-configure this — it is stored in EP's persistent
+  storage, not in the CR.
+- The `trustedCertificates` field in the EP CR is still useful: it allows Vert.x to trust
+  the bootstrap URL without a cert acceptance prompt, which prevents session timeouts during
+  wizard navigation. Keep it configured.
+- The root fix is IBM correcting ES 12.2.x to send the full cert chain. Track the IBM
+  support case for a proper patch.
+
+---
 
 ## Connection Options
 
-Event Processing supports both internal and external SCRAM-SHA-512 connections:
-
-1. **Internal SCRAM (Recommended)** - Keeps traffic within cluster
-2. **External SCRAM** - For external access or testing
+Only the **External SCRAM** listener works with EP event sources in ES 12.2.x.
 
 ---
 
-## Option 1: Internal SCRAM Connection (Recommended)
-
-### 1. Get the Internal Bootstrap URL
-
-```bash
-oc get eventstreams es-prod -n event-streams \
-  -o jsonpath='{.status.kafkaListeners[?(@.name=="intscram")].bootstrapServers}' && echo ""
-```
-
-Expected output:
-```
-es-prod-kafka-bootstrap.event-streams.svc:9093
-```
-
-### 2. Get SCRAM Credentials
-
-The `es-prod-admin` KafkaUser is provisioned via gitops (`instances/event-streams/admin-user.yaml`).
-The operator auto-generates the password.
-
-```bash
-# Username: es-prod-admin
-# Password:
-oc get secret es-prod-admin -n event-streams \
-  -o jsonpath='{.data.password}' | base64 -d && echo ""
-```
-
-### 3. Configure Event Source in EP
-
-1. Open the Event Processing UI
-2. Create a new flow (or edit existing)
-3. Add an **Event source** node
-4. Enter the **internal** bootstrap URL: `es-prod-kafka-bootstrap.event-streams.svc:9093`
-5. Click **Accept certificates** when prompted to trust the cluster CA certificate
-6. Click **Next** to proceed to **Access credentials**
-7. Select **SCRAM-SHA-512** as the security mechanism
-8. Enter username `es-prod-admin` and the password from step 2
-9. Select your topic and continue configuring the flow
-
-**Benefits:**
-- Traffic stays within the cluster (no external route)
-- Better performance (no route overhead)
-
----
-
-## Option 2: External SCRAM Connection
-
-Use this option for external access or testing from outside the cluster.
+## External SCRAM Connection
 
 ### 1. Get the External Bootstrap URL
 
-Use the actual Route hostname (not the ES UI "Connect to this cluster" page, which may show a
-different URL format). The Route hostname is the authoritative source:
+Use the Route hostname directly — not the ES UI "Connect to this cluster" page:
 
 ```bash
 oc get route es-prod-kafka-extscram-bootstrap -n event-streams -o jsonpath='{.spec.host}'
 ```
 
-Use port **443** (OpenShift Routes always expose 443 externally, regardless of the internal port):
+Use port **443** (OpenShift Routes always expose 443 externally):
+
 ```
 es-prod-kafka-extscram-bootstrap-event-streams.apps.<cluster-domain>:443
 ```
 
-### 2-3. Follow Same Steps as Internal
+### 2. Get SCRAM Credentials
 
-Use the same SCRAM credentials from Option 1, but with the external bootstrap URL in step 4.
+```bash
+oc get secret es-prod-admin -n event-streams \
+  -o jsonpath='{.data.password}' | base64 -d && echo ""
+```
+
+Username: `es-prod-admin`
+
+### 3. Configure Event Source in EP
+
+1. Open the EP UI and create a new flow
+2. Add an **Event source** node
+3. Enter the external bootstrap URL with port 443
+4. Select **SCRAM-SHA-512**, enter credentials
+5. Select your topic
+6. Click **Preview SQL** and replace `ssl.truststore.certificates` with the CA cert (see above)
+
+### 4. Configure Sink (if writing back to ES)
+
+1. Add an **Event destination** node
+2. Complete the wizard with the same bootstrap URL and credentials
+3. Click **Preview SQL** and replace `ssl.truststore.certificates` with the CA cert
+
+---
+
+## Known Open Issues
+
+| Issue | Impact | Status |
+|---|---|---|
+| ES 12.2.x leaf-cert-only TLS | Manual cert replacement per event source/sink | Workaround above |
+| EP UI flow preview blank | Cannot see events on flow canvas | Check sink topic in ES UI |
+| ES UI Producers/Monitoring "Uh oh" error | ES metrics UI broken | Under investigation |

@@ -24,11 +24,9 @@ spec:
     tls:
       ui:
         secretName: ep-ui-tls
-      # trustedCertificates temporarily removed to force cert acceptance page in EP UI
-      # Restore after event source is configured with CA cert
-      # trustedCertificates:
-      #   - secretName: es-cluster-ca
-      #     certificate: es-ca.crt
+      trustedCertificates:
+        - secretName: es-cluster-ca
+          certificate: es-ca.crt
     template:
       pod:
         spec:
