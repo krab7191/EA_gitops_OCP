@@ -28,13 +28,14 @@ spec:
               # Wrapper: authenticated curl against the in-cluster K8s API
               kcurl() { curl -sf --cacert "$KUBE_CA" -H "Authorization: Bearer $TOKEN" "$@"; }
 
-              # Server-Side Apply a secret
+              # Server-Side Apply a secret (write payload to file to avoid ARG_MAX limits)
               kapply() {
                 local ns=$1 name=$2 payload=$3
+                printf '%s' "$payload" > /tmp/kapply-payload.json
                 kcurl -X PATCH \
                   -H "Content-Type: application/apply-patch+yaml" \
                   "${API}/api/v1/namespaces/${ns}/secrets/${name}?fieldManager=es-ca-sync&force=true" \
-                  -d "$payload"
+                  -d @/tmp/kapply-payload.json
               }
 
               # Wait for ES cluster CA cert (created by ES operator after ES finishes reconciling).
