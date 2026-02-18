@@ -7,13 +7,15 @@
   authentication. SCRAM-authenticated users get a 403 error. All credentials must be created
   via gitops (KafkaUser CRs) or `oc` CLI instead.
 
-- **ES 12.2.x TLS bug — manual cert replacement required.** ES 12.2.x brokers send only the
-  leaf certificate during the TLS handshake (`tls.pemChainIncluded=false`), not the full chain.
-  EP's Kafka client uses `ssl.truststore.type=PEM` and stores whichever cert it receives from
-  the bootstrap broker. When the Kafka client then connects to individual broker routes (each
-  with a different leaf cert), PKIX validation fails. The JKS truststore and
-  `trustedCertificates` in the EP CR do not fix this — they only affect EP's Vert.x SSL
-  context, not the Kafka client. See [workaround below](#es-122x-tls-workaround).
+- **ES 12.2.x TLS bug — manual cert replacement required.** This is a bug in **Event Streams
+  12.2.x** (not in EP or Flink). ES 12.2.x brokers send only the leaf certificate during the
+  TLS handshake (`tls.pemChainIncluded=false`), not the full chain. EP's Kafka client
+  (behaving correctly) stores whichever cert it receives from the bootstrap broker in
+  `ssl.truststore.type=PEM`. When the Kafka client then connects to individual broker routes
+  (each with a different leaf cert), PKIX validation fails because the CA cert was never
+  provided. The JKS truststore and `trustedCertificates` in the EP CR do not fix this — they
+  only affect EP's Vert.x SSL context, not the Kafka client.
+  See [workaround below](#es-122x-tls-workaround).
 
 - **Internal SCRAM (9093) not usable for EP event sources.** The EP event source wizard
   validates the bootstrap URL before accepting credentials. The internal SCRAM listener
@@ -126,6 +128,6 @@ Username: `es-prod-admin`
 
 | Issue | Impact | Status |
 |---|---|---|
-| ES 12.2.x leaf-cert-only TLS | Manual cert replacement per event source/sink | Workaround above |
+| ES 12.2.x bug: leaf-cert-only TLS | Manual cert replacement per event source/sink | Workaround above; IBM support case open |
 | EP UI flow preview blank | Cannot see events on flow canvas | Check sink topic in ES UI |
 | ES UI Producers/Monitoring "Uh oh" error | ES metrics UI broken | Under investigation |
