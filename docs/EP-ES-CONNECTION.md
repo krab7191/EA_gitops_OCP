@@ -30,24 +30,45 @@
 
 ## ES 12.2.x TLS Workaround
 
-After configuring an event source or sink in the EP wizard, the generated SQL will contain
-`ssl.truststore.certificates` set to the bootstrap broker's leaf cert. This must be manually
-replaced with the cluster CA cert so EP's Kafka client can validate all per-broker route certs.
+Two approaches work. **Option 2 (JKS) is preferred** — it requires no cert content in the
+SQL and is consistent across all flows.
 
-### 1. Get the cluster CA cert
+---
+
+### Option 2 (Preferred): JKS Truststore — remove SSL properties from SQL
+
+The `es-ca-sync` ArgoCD PostSync job automatically builds a JKS truststore containing the
+ES cluster CA and mounts it into the EP pod via the `ssl-truststore` secret. The EP CR
+configures `JAVA_TOOL_OPTIONS` to point the JVM at this truststore.
+
+When `ssl.truststore.type` and `ssl.truststore.certificates` are absent from the Flink SQL,
+the Kafka client falls back to the JVM truststore, which already trusts all ES broker certs.
+
+**After completing the event source/sink wizard**, click the node → **Edit** → **Preview SQL**
+and remove these two properties:
+
+```sql
+'properties.ssl.truststore.type' = 'PEM',
+'properties.ssl.truststore.certificates' = '...',
+```
+
+Leave all other properties unchanged. Do this for every event source and every sink node.
+
+The EP UI flow canvas preview will show live events when using this approach.
+
+---
+
+### Option 1 (Alternative): Replace leaf cert with CA cert in SQL
+
+If the JKS is not available, replace `ssl.truststore.certificates` with the cluster CA cert
+instead of the auto-filled leaf cert:
 
 ```bash
 oc get secret es-prod-cluster-ca-cert -n event-streams \
   -o jsonpath='{.data.ca\.crt}' | base64 -d
 ```
 
-Copy the full PEM output (`-----BEGIN CERTIFICATE-----` through `-----END CERTIFICATE-----`).
-
-### 2. Edit the event source SQL
-
-In the EP flow canvas, click the event source node → **Edit** → **Preview SQL**.
-
-Find the `ssl.truststore.certificates` property and replace the leaf cert with the CA cert:
+In **Preview SQL**, replace the cert value:
 
 ```sql
 'properties.ssl.truststore.certificates' = '-----BEGIN CERTIFICATE-----
@@ -56,21 +77,16 @@ Find the `ssl.truststore.certificates` property and replace the leaf cert with t
 ',
 ```
 
-Submit the updated SQL.
+Keep `'properties.ssl.truststore.type' = 'PEM'`. Repeat for every source and sink.
 
-### 3. Repeat for every sink
-
-EP auto-fills the leaf cert for every new event source and sink. Repeat step 2 for each
-sink node's SQL.
+---
 
 ### Notes
 
-- This replacement must be done manually each time an event source or sink is created.
-  There is no GitOps-friendly way to pre-configure this — it is stored in EP's persistent
-  storage, not in the CR.
-- The `trustedCertificates` field in the EP CR is still useful: it allows Vert.x to trust
-  the bootstrap URL without a cert acceptance prompt, which prevents session timeouts during
-  wizard navigation. Keep it configured.
+- Both workarounds require manual SQL editing per event source and sink after the wizard
+  completes. There is no GitOps-friendly way to pre-configure this.
+- The `trustedCertificates` field in the EP CR is still required: it allows Vert.x to trust
+  the bootstrap URL during wizard navigation without a cert acceptance prompt.
 - The root fix is IBM correcting ES 12.2.x to send the full cert chain. Track the IBM
   support case for a proper patch.
 
@@ -129,5 +145,5 @@ Username: `es-prod-admin`
 | Issue | Impact | Status |
 |---|---|---|
 | ES 12.2.x bug: leaf-cert-only TLS | Manual cert replacement per event source/sink | Workaround above; IBM support case open |
-| EP UI flow preview blank | Cannot see events on flow canvas | Check sink topic in ES UI |
+| EP UI flow preview blank | Cannot see events on flow canvas | Resolved when using Option 2 (JKS) |
 | ES UI Producers/Monitoring "Uh oh" error | ES metrics UI broken | Under investigation |
