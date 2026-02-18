@@ -33,10 +33,13 @@ spec:
           containers:
             - name: backend
               env:
+                - name: TRUSTSTORE_PASS
+                  valueFrom:
+                    secretKeyRef:
+                      name: ssl-truststore-password
+                      key: password
                 - name: JAVA_TOOL_OPTIONS
-                  value: >-
-                    -Djavax.net.ssl.trustStore=/opt/ibm/sp-backend/certs/truststore.jks
-                    -Djavax.net.ssl.trustStorePassword=changeit
+                  value: "-Djavax.net.ssl.trustStore=/opt/ibm/sp-backend/certs/truststore.jks -Djavax.net.ssl.trustStorePassword=$(TRUSTSTORE_PASS)"
               volumeMounts:
                 - mountPath: /opt/ibm/sp-backend/certs
                   name: truststore

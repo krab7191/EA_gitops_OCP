@@ -16,6 +16,12 @@ spec:
       containers:
         - name: sync
           image: registry.access.redhat.com/ubi9/openjdk-21:latest
+          env:
+            - name: STOREPASS
+              valueFrom:
+                secretKeyRef:
+                  name: ssl-truststore-password
+                  key: password
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -66,11 +72,15 @@ spec:
                 | base64 -d > /tmp/es-ca.crt
 
               # Build JKS: start from the JDK default cacerts then import ES cluster CA.
+              # The default cacerts password is "changeit" — change it to our sealed secret
+              # password before importing, so all consumers use the same secret.
               echo "Building JKS truststore..."
               cp "${JAVA_HOME}/lib/security/cacerts" /tmp/truststore.jks
               chmod 644 /tmp/truststore.jks
+              keytool -storepasswd -keystore /tmp/truststore.jks \
+                -storepass changeit -new "$STOREPASS"
               keytool -keystore /tmp/truststore.jks -alias es-cluster-ca -import \
-                -file /tmp/es-ca.crt -noprompt -storepass changeit -trustcacerts
+                -file /tmp/es-ca.crt -noprompt -storepass "$STOREPASS" -trustcacerts
 
               # Optionally add EP root CA — may not exist yet if EP hasn't reconciled.
               # The job will re-run on the next ArgoCD sync and pick it up then.
@@ -82,7 +92,7 @@ spec:
                   | cut -d'"' -f4 \
                   | base64 -d > /tmp/ep-root-ca.crt
                 keytool -keystore /tmp/truststore.jks -alias ep-root-ca -import \
-                  -file /tmp/ep-root-ca.crt -noprompt -storepass changeit -trustcacerts
+                  -file /tmp/ep-root-ca.crt -noprompt -storepass "$STOREPASS" -trustcacerts
               else
                 echo "EP root CA not yet available — skipping (will be added on next sync)"
               fi

@@ -24,21 +24,54 @@ Fork this repo, then update the `repoURL` in these files to point to your fork:
 
 ### 2. Create Sealed Secrets
 
-All sealed secrets go in `operators/ibm-catalogs/` directory.
+All sealed secrets must be created with `kubeseal` and committed to git. They are
+namespace-scoped — a secret sealed for one namespace cannot be used in another.
 
-**IBM Entitlement Key:**
+#### IBM Entitlement Key
+
+Required in every namespace that pulls IBM container images.
+
 ```bash
 export IBM_ENTITLEMENT_KEY="your-key"
 
-oc create secret docker-registry ibm-entitlement-key \
-  --docker-server=cp.icr.io --docker-username=cp \
-  --docker-password="${IBM_ENTITLEMENT_KEY}" \
-  -n openshift-operators --dry-run=client -o yaml | \
-kubeseal --format=yaml --controller-namespace=sealed-secrets \
-  > operators/ibm-catalogs/sealed-entitlement-key.yaml
+for NS in openshift-operators event-streams event-processing event-endpoint-mgmt flink; do
+  oc create secret docker-registry ibm-entitlement-key \
+    --docker-server=cp.icr.io --docker-username=cp \
+    --docker-password="${IBM_ENTITLEMENT_KEY}" \
+    -n $NS --dry-run=client -o yaml | \
+  kubeseal --format=yaml --controller-namespace=sealed-secrets \
+    --controller-name=sealed-secrets-controller \
+    > operators/ibm-catalogs/sealed-entitlement-key-${NS}.yaml
+done
 ```
 
-**OIDC secrets (Event Processing & Event Endpoint Management):**
+> The file committed in `operators/ibm-catalogs/sealed-entitlement-key.yaml` covers
+> `openshift-operators` only. Rename or regenerate as needed for other namespaces.
+
+#### JKS Truststore Password
+
+Used by the Event Processing backend and Flink pods to open the mounted JKS truststore,
+and by the `es-ca-sync` job when building the JKS with `keytool`.
+
+```bash
+export TRUSTSTORE_PASS="your-password"
+
+for NS in event-processing flink event-streams; do
+  oc create secret generic ssl-truststore-password \
+    --from-literal=password="${TRUSTSTORE_PASS}" \
+    -n $NS --dry-run=client -o yaml | \
+  kubeseal --format=yaml --controller-namespace=sealed-secrets \
+    --controller-name=sealed-secrets-controller \
+    > operators/es-ca-sync/sealed-truststore-password-${NS}.yaml
+done
+```
+
+> The same password must be used when the JKS is built and when it is opened.
+> The `es-ca-sync` job and both CRs (`FlinkDeployment`, `EventProcessing`) all
+> reference `ssl-truststore-password` in their respective namespaces.
+
+#### OIDC Secrets (Event Processing & Event Endpoint Management)
+
 ```bash
 export KEYCLOAK_URL="https://keycloak.example.com"
 export KEYCLOAK_REALM="your-realm"
@@ -53,6 +86,7 @@ oc create secret generic oidc-client-secret \
   --from-literal=discovery-url="${DISCOVERY_URL}" \
   -n event-processing --dry-run=client -o yaml | \
 kubeseal --format=yaml --controller-namespace=sealed-secrets \
+  --controller-name=sealed-secrets-controller \
   > operators/ibm-catalogs/event-processing-oidc-secret.yaml
 
 # Event Endpoint Management
@@ -62,12 +96,29 @@ oc create secret generic oidc-client-secret \
   --from-literal=discovery-url="${DISCOVERY_URL}" \
   -n event-endpoint-mgmt --dry-run=client -o yaml | \
 kubeseal --format=yaml --controller-namespace=sealed-secrets \
+  --controller-name=sealed-secrets-controller \
   > operators/ibm-catalogs/event-endpoint-mgmt-oidc-secret.yaml
 ```
 
-> **Note:** Event Streams uses SCRAM-SHA-512 authentication for the Admin UI (not OIDC).
-> The operator generates credentials from the KafkaUser CR (`admin-user.yaml`).
-> No sealed secret is needed — see [Retrieving Event Streams SCRAM credentials](#5-access) below.
+> **Event Streams** uses SCRAM-SHA-512 for the Admin UI — no OIDC secret needed.
+> Credentials are auto-generated from the `KafkaUser` CR. See [Access](#6-access) below.
+
+#### Summary of Required Sealed Secrets
+
+| Secret name | Namespace(s) | File location |
+|---|---|---|
+| `ibm-entitlement-key` | `openshift-operators`, `event-streams`, `event-processing`, `event-endpoint-mgmt`, `flink` | `operators/ibm-catalogs/` |
+| `ssl-truststore-password` | `event-processing`, `flink`, `event-streams` | `operators/es-ca-sync/` |
+| `oidc-client-secret` | `event-processing`, `event-endpoint-mgmt` | `operators/ibm-catalogs/` |
+
+#### Automatically Managed Secrets (no manual action needed)
+
+These are created and kept in sync automatically by the `es-ca-sync` ArgoCD PostSync job:
+
+| Secret name | Namespace(s) | Contents |
+|---|---|---|
+| `es-cluster-ca` | `event-processing`, `event-endpoint-mgmt`, `flink` | ES cluster CA cert (PEM) |
+| `ssl-truststore` | `event-processing`, `event-endpoint-mgmt`, `flink` | JKS truststore (ES CA + EP CA) |
 
 ### 3. Configure Keycloak
 
@@ -96,15 +147,7 @@ https://<ep-route>/callback
 https://<eem-route>/callback
 ```
 
-### 4. Commit and Push
-
-```bash
-git add operators/ibm-catalogs/
-git commit -m "Add sealed secrets"
-git push
-```
-
-### 5. Deploy
+### 4. Deploy
 
 ```bash
 oc apply -f argocd-app-of-apps.yaml
@@ -112,7 +155,7 @@ oc apply -f argocd-app-of-apps.yaml
 
 Wait 15-30 minutes for everything to deploy.
 
-### 6. Monitor
+### 5. Monitor
 
 ```bash
 oc get applications -n openshift-gitops
@@ -122,7 +165,7 @@ oc get pods -n event-endpoint-mgmt
 oc get pods -n flink
 ```
 
-### 7. Access
+### 6. Access
 
 **ArgoCD UI:**
 ```bash
