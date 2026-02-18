@@ -7,7 +7,8 @@ metadata:
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
-  backoffLimit: 1
+  backoffLimit: 2
+  activeDeadlineSeconds: 720
   template:
     spec:
       restartPolicy: Never
@@ -15,40 +16,86 @@ spec:
       containers:
         - name: sync
           image: registry.access.redhat.com/ubi9/openjdk-21:latest
-          command: ["/bin/sh","-c"]
+          command: ["/bin/sh", "-c"]
           args:
             - |
               set -eu
 
-              # Install kubectl
-              curl -sLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-              chmod +x /tmp/kubectl
-              export PATH="/tmp:$PATH"
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              KUBE_CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              API=https://kubernetes.default.svc:443
 
-              # Extract ES cluster CA cert
-              CA="$(kubectl -n event-streams get secret es-prod-cluster-ca-cert \
-                   -o go-template='{{index .data "ca.crt" | base64decode}}')"
-              printf "%s" "$CA" > /tmp/es-ca.crt
+              # Wrapper: authenticated curl against the in-cluster K8s API
+              kcurl() { curl -sf --cacert "$KUBE_CA" -H "Authorization: Bearer $TOKEN" "$@"; }
 
-              # Extract EP root CA cert
-              EP_CA="$(kubectl -n event-processing get secret production-processing-ibm-ep-root-ca \
-                   -o go-template='{{index .data "ca.crt" | base64decode}}')"
-              printf "%s" "$EP_CA" > /tmp/ep-root-ca.crt
+              # Server-Side Apply a secret
+              kapply() {
+                local ns=$1 name=$2 payload=$3
+                kcurl -X PATCH \
+                  -H "Content-Type: application/apply-patch+yaml" \
+                  "${API}/api/v1/namespaces/${ns}/secrets/${name}?fieldManager=es-ca-sync&force=true" \
+                  -d "$payload"
+              }
 
-              # Build JKS truststore: default cacerts + ES CA + EP root CA
-              cp "$JAVA_HOME/lib/security/cacerts" /tmp/truststore.jks
+              # Wait for ES cluster CA cert (created by ES operator after ES finishes reconciling).
+              # The operators app (wave 0) PostSync fires before ES (wave 1) deploys, so we
+              # poll here until the secret exists — up to ~10 minutes.
+              echo "Waiting for es-prod-cluster-ca-cert to exist..."
+              for i in $(seq 1 60); do
+                if kcurl "${API}/api/v1/namespaces/event-streams/secrets/es-prod-cluster-ca-cert" > /dev/null 2>&1; then
+                  echo "  found after attempt ${i}"
+                  break
+                fi
+                if [ "$i" -eq 60 ]; then
+                  echo "ERROR: timed out after 10 minutes waiting for ES CA cert"
+                  exit 1
+                fi
+                echo "  attempt ${i}/60 — retrying in 10s..."
+                sleep 10
+              done
+
+              # Extract the ES cluster CA cert (the CA that signs broker leaf certs).
+              # ES 12.2.x broke EP/Flink integration by no longer including this CA in the
+              # TLS handshake chain, so clients must trust it explicitly via the JKS.
+              echo "Extracting ES cluster CA cert..."
+              kcurl "${API}/api/v1/namespaces/event-streams/secrets/es-prod-cluster-ca-cert" \
+                | tr -d '\n' \
+                | grep -Eo '"ca\.crt":"[^"]*"' \
+                | cut -d'"' -f4 \
+                | base64 -d > /tmp/es-ca.crt
+
+              # Build JKS: start from the JDK default cacerts then import ES cluster CA.
+              echo "Building JKS truststore..."
+              cp "${JAVA_HOME}/lib/security/cacerts" /tmp/truststore.jks
               chmod 644 /tmp/truststore.jks
               keytool -keystore /tmp/truststore.jks -alias es-cluster-ca -import \
                 -file /tmp/es-ca.crt -noprompt -storepass changeit -trustcacerts
-              keytool -keystore /tmp/truststore.jks -alias ep-root-ca -import \
-                -file /tmp/ep-root-ca.crt -noprompt -storepass changeit -trustcacerts
 
-              # Push PEM secret and JKS truststore secret to each namespace
+              # Optionally add EP root CA — may not exist yet if EP hasn't reconciled.
+              # The job will re-run on the next ArgoCD sync and pick it up then.
+              if kcurl "${API}/api/v1/namespaces/event-processing/secrets/production-processing-ibm-ep-root-ca" > /dev/null 2>&1; then
+                echo "Adding EP root CA to truststore..."
+                kcurl "${API}/api/v1/namespaces/event-processing/secrets/production-processing-ibm-ep-root-ca" \
+                  | tr -d '\n' \
+                  | grep -Eo '"ca\.crt":"[^"]*"' \
+                  | cut -d'"' -f4 \
+                  | base64 -d > /tmp/ep-root-ca.crt
+                keytool -keystore /tmp/truststore.jks -alias ep-root-ca -import \
+                  -file /tmp/ep-root-ca.crt -noprompt -storepass changeit -trustcacerts
+              else
+                echo "EP root CA not yet available — skipping (will be added on next sync)"
+              fi
+
+              ES_CA_B64=$(base64 -w0 /tmp/es-ca.crt)
+              JKS_B64=$(base64 -w0 /tmp/truststore.jks)
+
+              # Push the PEM cert and JKS truststore secret to every consumer namespace
               for NS in event-processing event-endpoint-mgmt flink; do
-                kubectl -n "$NS" create secret generic es-cluster-ca \
-                  --from-file=es-ca.crt=/tmp/es-ca.crt \
-                  --dry-run=client -o yaml | kubectl -n "$NS" apply -f -
-                kubectl -n "$NS" create secret generic ssl-truststore \
-                  --from-file=truststore.jks=/tmp/truststore.jks \
-                  --dry-run=client -o yaml | kubectl -n "$NS" apply -f -
+                echo "Applying secrets to namespace ${NS}..."
+                kapply "$NS" "es-cluster-ca" \
+                  "{\"apiVersion\":\"v1\",\"kind\":\"Secret\",\"metadata\":{\"name\":\"es-cluster-ca\",\"namespace\":\"${NS}\"},\"data\":{\"es-ca.crt\":\"${ES_CA_B64}\"}}"
+                kapply "$NS" "ssl-truststore" \
+                  "{\"apiVersion\":\"v1\",\"kind\":\"Secret\",\"metadata\":{\"name\":\"ssl-truststore\",\"namespace\":\"${NS}\"},\"data\":{\"truststore.jks\":\"${JKS_B64}\"}}"
               done
+
+              echo "Done — secrets applied to event-processing, event-endpoint-mgmt, flink."
