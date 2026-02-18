@@ -68,12 +68,14 @@ Use this option for external access or testing from outside the cluster.
 
 ### 1. Get the External Bootstrap URL
 
+Use the actual Route hostname (not the ES UI "Connect to this cluster" page, which may show a
+different URL format). The Route hostname is the authoritative source:
+
 ```bash
-oc get eventstreams es-prod -n event-streams \
-  -o jsonpath='{.status.kafkaListeners[?(@.name=="extscram")].bootstrapServers}' && echo ""
+oc get route es-prod-kafka-extscram-bootstrap -n event-streams -o jsonpath='{.spec.host}'
 ```
 
-Expected output:
+Use port **443** (OpenShift Routes always expose 443 externally, regardless of the internal port):
 ```
 es-prod-kafka-extscram-bootstrap-event-streams.apps.<cluster-domain>:443
 ```
