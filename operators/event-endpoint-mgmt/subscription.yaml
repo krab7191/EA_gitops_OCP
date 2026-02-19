@@ -6,7 +6,7 @@ metadata:
   namespace: event-endpoint-mgmt
 spec:
   channel: v11.7
-  installPlanApproval: Automatic
+  installPlanApproval: Manual
   name: ibm-eventendpointmanagement
   source: ibm-operator-catalog
   sourceNamespace: openshift-marketplace

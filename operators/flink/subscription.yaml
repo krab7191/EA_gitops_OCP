@@ -6,7 +6,7 @@ metadata:
   namespace: flink
 spec:
   channel: v1.4
-  installPlanApproval: Automatic
+  installPlanApproval: Manual
   name: ibm-eventautomation-flink
   source: ibm-operator-catalog
   sourceNamespace: openshift-marketplace

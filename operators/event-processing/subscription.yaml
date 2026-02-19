@@ -6,7 +6,7 @@ metadata:
   namespace: event-processing
 spec:
   channel: v1.4
-  installPlanApproval: Automatic
+  installPlanApproval: Manual
   name: ibm-eventprocessing
   source: ibm-operator-catalog
   sourceNamespace: openshift-marketplace
