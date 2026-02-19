@@ -1,0 +1,46 @@
+---
+# Custom health check for OLM Subscriptions.
+#
+# All operator subscriptions in this repo use installPlanApproval: Manual to
+# prevent automatic upgrades. When a newer version is available in the catalog,
+# OLM creates an InstallPlan and sets the subscription state to "UpgradePending"
+# waiting for manual approval. Without this health check, ArgoCD treats
+# UpgradePending as Progressing, causing the operators app to show Progressing
+# indefinitely even though everything is functioning correctly.
+#
+# This patch adds a Lua health check that treats UpgradePending as Healthy,
+# since a pending unapproved upgrade is an intentional state in this repo.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: openshift-gitops
+data:
+  resource.customizations.health.operators.coreos.com_Subscription: |
+    hs = {}
+    if obj.status ~= nil then
+      if obj.status.state == "AtLatestKnown" then
+        hs.status = "Healthy"
+        hs.message = obj.status.state
+        return hs
+      end
+      -- Suppress UpgradePending only for the ES 12.2.1 upgrade.
+      -- ibm-eventstreams.v12.2.1 has a known TLS bug (brokers send only leaf
+      -- cert, breaking EP/Flink connection). The subscription is intentionally
+      -- pinned to 12.2.0 with Manual approval. Remove this exception if/when
+      -- upgrading to a fixed version.
+      if obj.status.state == "UpgradePending" and
+         obj.status.currentCSV == "ibm-eventstreams.v12.2.1" then
+        hs.status = "Healthy"
+        hs.message = "UpgradePending: ibm-eventstreams.v12.2.1 intentionally held (known TLS bug)"
+        return hs
+      end
+      if obj.status.state == "Installing" then
+        hs.status = "Progressing"
+        hs.message = "Installing"
+        return hs
+      end
+    end
+    hs.status = "Progressing"
+    hs.message = "Waiting for subscription"
+    return hs
