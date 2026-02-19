@@ -121,9 +121,25 @@ https://<eem-route>/callback
 oc apply -f argocd-app-of-apps.yaml
 ```
 
+### 5. Approve Event Streams InstallPlan
+
+The Event Streams subscription uses `installPlanApproval: Manual` to prevent OLM from
+automatically upgrading to a version with a known TLS bug. OLM will create an InstallPlan
+for `ibm-eventstreams.v12.2.0` that must be approved before the operator installs.
+
+Wait ~2 minutes after deploying, then:
+
+```bash
+# Find the InstallPlan
+oc get installplan -n event-streams
+
+# Approve it (replace <name> with the actual name)
+oc patch installplan <name> -n event-streams --type merge -p '{"spec":{"approved":true}}'
+```
+
 Wait 15-30 minutes for everything to deploy.
 
-### 5. Monitor
+### 6. Monitor
 
 ```bash
 oc get applications -n openshift-gitops
@@ -133,7 +149,7 @@ oc get pods -n event-endpoint-mgmt
 oc get pods -n flink
 ```
 
-### 6. Access
+### 7. Access
 
 **ArgoCD UI:**
 ```bash

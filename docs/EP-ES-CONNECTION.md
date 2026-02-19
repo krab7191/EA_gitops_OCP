@@ -2,15 +2,9 @@
 
 ## Known Limitations
 
-- **ES UI cannot generate credentials without IAM.** The ES UI "Connect to this cluster" /
-  "Generate credentials" feature requires IBM Cloud Pak foundational services (IAM)
-  authentication. SCRAM-authenticated users get a 403 error. All credentials must be created
-  via gitops (KafkaUser CRs) or `oc` CLI instead.
+- **ES UI cannot generate credentials without IAM.** The ES UI "Connect to this cluster" / "Generate credentials" feature requires IBM Cloud Pak foundational services (IAM) authentication. SCRAM-authenticated users get a 403 error. All credentials must be created via gitops (KafkaUser CRs) or `oc` CLI instead.
 
-- **Internal SCRAM (9093) not usable for EP event sources.** The EP event source wizard
-  validates the bootstrap URL before accepting credentials. The internal SCRAM listener
-  returns "Connection credential not required" at the introspection step. Use the external
-  SCRAM listener (port 443) instead.
+- **Accept certificate prompt.** The EP wizard will prompt you to accept the ES TLS certificate when connecting to either listener. This is expected — tick the checkbox to proceed.
 
 ---
 
@@ -27,25 +21,17 @@ The ES subscription is pinned to `startingCSV: ibm-eventstreams.v12.2.0` with
 
 ## Connection Options
 
-Only the **External SCRAM** listener works with EP event sources.
+Both the **Internal SCRAM** and **External SCRAM** listeners work with EP event sources. Prefer the internal listener for in-cluster deployments (lower latency, no egress).
 
 ---
 
-## External SCRAM Connection
+## Internal SCRAM Connection (Recommended)
 
-### 1. Get the External Bootstrap URL
+Use this when EP and ES are in the same cluster.
 
-Use the Route hostname directly — not the ES UI "Connect to this cluster" page:
+### 1. Get the Internal Bootstrap URL
 
-```bash
-oc get route es-prod-kafka-extscram-bootstrap -n event-streams -o jsonpath='{.spec.host}'
-```
-
-Use port **443** (OpenShift Routes always expose 443 externally):
-
-```
-es-prod-kafka-extscram-bootstrap-event-streams.apps.<cluster-domain>:443
-```
+In the ES UI: **Connect to this cluster → Internal**. Use the hostname shown there.
 
 ### 2. Get SCRAM Credentials
 
@@ -60,16 +46,40 @@ Username: `es-prod-admin`
 
 1. Open the EP UI and create a new flow
 2. Add an **Event source** node
-3. Enter the external bootstrap URL with port 443
-4. Select **SCRAM-SHA-512**, enter credentials
-5. Select your topic
-6. Click **Configure** — no SQL editing required
+3. Enter the internal bootstrap URL from the ES UI
+4. Accept the certificate when prompted
+5. Select **SCRAM-SHA-512**, enter credentials
+6. Select your topic
+7. Click **Configure**
 
-### 4. Configure Sink (if writing back to ES)
+---
 
-1. Add an **Event destination** node
-2. Complete the wizard with the same bootstrap URL and credentials
-3. No SQL editing required
+## External SCRAM Connection
+
+Use this when EP is in a different cluster, or as a fallback.
+
+### 1. Get the External Bootstrap URL
+
+In the ES UI: **Connect to this cluster → External**. Use the hostname shown there.
+
+### 2. Get SCRAM Credentials
+
+```bash
+oc get secret es-prod-admin -n event-streams \
+  -o jsonpath='{.data.password}' | base64 -d && echo ""
+```
+
+Username: `es-prod-admin`
+
+### 3. Configure Event Source in EP
+
+1. Open the EP UI and create a new flow
+2. Add an **Event source** node
+3. Enter the external bootstrap URL from the ES UI
+4. Accept the certificate when prompted
+5. Select **SCRAM-SHA-512**, enter credentials
+6. Select your topic
+7. Click **Configure**
 
 ---
 
@@ -77,5 +87,4 @@ Username: `es-prod-admin`
 
 | Issue | Impact | Status |
 |---|---|---|
-| Internal SCRAM URL rejected by EP wizard | Must use external SCRAM (port 443) | Under investigation |
 | ES UI Producers/Monitoring tab missing | ES metrics UI incomplete | Under investigation |
