@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ibm-licensing
+  labels:
+    app.kubernetes.io/name: ibm-licensing
+    app.kubernetes.io/part-of: event-automation
