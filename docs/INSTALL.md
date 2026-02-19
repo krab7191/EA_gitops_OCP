@@ -48,28 +48,6 @@ done
 > The file committed in `operators/ibm-catalogs/sealed-entitlement-key.yaml` covers
 > `openshift-operators` only. Rename or regenerate as needed for other namespaces.
 
-#### JKS Truststore Password
-
-Used by the Event Processing backend and Flink pods to open the mounted JKS truststore,
-and by the `es-ca-sync` job when building the JKS with `keytool`.
-
-```bash
-export TRUSTSTORE_PASS="your-password"
-
-for NS in event-processing flink event-streams; do
-  oc create secret generic ssl-truststore-password \
-    --from-literal=password="${TRUSTSTORE_PASS}" \
-    -n $NS --dry-run=client -o yaml | \
-  kubeseal --format=yaml --controller-namespace=sealed-secrets \
-    --controller-name=sealed-secrets-controller \
-    > operators/es-ca-sync/sealed-truststore-password-${NS}.yaml
-done
-```
-
-> The same password must be used when the JKS is built and when it is opened.
-> The `es-ca-sync` job and both CRs (`FlinkDeployment`, `EventProcessing`) all
-> reference `ssl-truststore-password` in their respective namespaces.
-
 #### OIDC Secrets (Event Processing & Event Endpoint Management)
 
 ```bash
@@ -108,17 +86,7 @@ kubeseal --format=yaml --controller-namespace=sealed-secrets \
 | Secret name | Namespace(s) | File location |
 |---|---|---|
 | `ibm-entitlement-key` | `openshift-operators`, `event-streams`, `event-processing`, `event-endpoint-mgmt`, `flink` | `operators/ibm-catalogs/` |
-| `ssl-truststore-password` | `event-processing`, `flink`, `event-streams` | `operators/es-ca-sync/` |
 | `oidc-client-secret` | `event-processing`, `event-endpoint-mgmt` | `operators/ibm-catalogs/` |
-
-#### Automatically Managed Secrets (no manual action needed)
-
-These are created and kept in sync automatically by the `es-ca-sync` ArgoCD PostSync job:
-
-| Secret name | Namespace(s) | Contents |
-|---|---|---|
-| `es-cluster-ca` | `event-processing`, `event-endpoint-mgmt`, `flink` | ES cluster CA cert (PEM) |
-| `ssl-truststore` | `event-processing`, `event-endpoint-mgmt`, `flink` | JKS truststore (ES CA + EP CA) |
 
 ### 3. Configure Keycloak
 
