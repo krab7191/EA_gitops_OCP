@@ -14,17 +14,38 @@ spec:
     use: EventAutomationProduction
     license: L-CYBH-K48BZQ
     metric: VIRTUAL_PROCESSOR_CORE
-  
+
   # Manager component - API catalog and governance
   manager:
-    # OIDC authentication
+    # OIDC authentication configuration
     # ROSA: change site to Azure AD issuer URL, e.g. https://login.microsoftonline.com/<tenant-id>/v2.0
     # ROSA: update authorizationClaimPointer to match Azure AD token claim path (e.g. /roles or /groups)
+    # ROSA: update userGroupClaimPointer to match Azure AD groups claim path (e.g. /groups)
     # ROSA: regenerate oidc-client-secret sealed secret with Azure AD client credentials
     authConfig:
       authType: OIDC
       oidcConfig:
+        # authorizationClaimPointer: JSON path to roles in OIDC token
+        # Used for role-based access control (admin, author, viewer)
+        # EEM checks ID token -> Access token -> User Info in that order
+        # Example: /roles maps to token.roles array
         authorizationClaimPointer: /roles
+        
+        # userGroupClaimPointer: JSON path to groups in OIDC token
+        # REQUIRED for user groups feature (cluster maintainers, event source editors, option viewers)
+        # Without this, the "User groups" menu will not appear in EEM UI
+        # Must point to a string or array of strings containing group names
+        # EEM checks ID token -> Access token -> User Info in that order
+        # Example: /groups maps to token.groups array from Keycloak
+        # Common paths: /groups, /resource_access/client-id/groups, /realm_access/groups
+        userGroupClaimPointer: /groups
+        
+        # additionalScopes: Optional additional OAuth scopes to request
+        # Uncomment and add "offline_access" if using Admin API with user groups
+        # This allows EEM to refresh tokens and retrieve up-to-date group memberships
+        # Note: Not all OIDC providers support offline_access
+        # additionalScopes: ["offline_access"]
+        
         clientIDKey: client-id
         clientSecretKey: client-secret
         discovery: true

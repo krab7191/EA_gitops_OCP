@@ -1,6 +1,17 @@
 ---
+# User role mappings for Event Endpoint Management
+# Maps OIDC token roles (from authorizationClaimPointer: /roles) to EEM permissions
 # ROSA: update "id" values to match Azure AD role/group names
-# EEM supports three roles: admin, author, viewer
+
+# EEM Role Hierarchy:
+# - viewer: View UI and shared resources (read-only)
+# - author: Create and share resources (includes viewer permissions)
+# - admin: Configure gateways, security, and user groups (includes author permissions)
+#
+# Note: Admin role hierarchically includes author and viewer, but we explicitly
+# assign all three roles to ensure maximum visibility and permissions across all UI features,
+# including the "User groups" menu and all administrative functions.
+
 apiVersion: v1
 kind: Secret
 metadata:
@@ -13,11 +24,11 @@ stringData:
       "mappings": [
         {
           "id": "admin",
-          "roles": ["admin"]
+          "roles": ["admin", "author", "viewer"]
         },
         {
           "id": "author",
-          "roles": ["author"]
+          "roles": ["author", "viewer"]
         },
         {
           "id": "viewer",
