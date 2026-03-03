@@ -24,15 +24,19 @@ stringData:
       "mappings": [
         {
           "id": "admin",
-          "roles": ["admin", "author", "viewer"]
+          "roles": ["admin", "author", "viewer", "user"]
         },
         {
           "id": "author",
-          "roles": ["author", "viewer"]
+          "roles": ["author", "viewer", "user"]
         },
         {
           "id": "viewer",
-          "roles": ["viewer"]
+          "roles": ["viewer", "user"]
+        },
+        {
+          "id": "user",
+          "roles": "user"
         }
       ]
     }
